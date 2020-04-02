@@ -43,8 +43,6 @@ class Switcher:
         for shortcut in SWITCH_SHORTCUTS:
             self.monitored_keys |= shortcut
 
-        self.current_layout = 0
-
     def on_press(self, key):
         if DEBUG:
             print("Pressed: {}".format(format_key(key)))
@@ -61,6 +59,10 @@ class Switcher:
     def on_release(self, key):
         if DEBUG:
             print("Released: {}".format(format_key(key)))
+
+        # Fix situations when were pressed Ctrl + Backspace + Shift
+        if key not in self.monitored_keys:
+            return
 
         self.keys_pressed -= 1
 
@@ -81,16 +83,22 @@ class Switcher:
         return False
 
     def on_switch(self):
-        self.current_layout += 1
-        if self.current_layout >= LAYOUTS_COUNT:
-            self.current_layout = 0
+        current_layout_command = subprocess.Popen(
+            "gsettings get org.gnome.desktop.input-sources current | awk '{ print $2 }'",
+            shell=True,
+            stdout=subprocess.PIPE)
+        current_layout = int(current_layout_command.stdout.read())
+
+        current_layout += 1
+        if current_layout >= LAYOUTS_COUNT:
+            current_layout = 0
 
         command = [
             "gsettings",
             "set",
             "org.gnome.desktop.input-sources",
             "current",
-            str(self.current_layout),
+            str(current_layout),
         ]
         _exitcode = subprocess.call(
             command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
